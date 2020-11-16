@@ -4,6 +4,7 @@ import * as types from "config/types";
 import { svg, withState } from "config/icon";
 import { hex } from "config/colors";
 import * as icons from "@mdi/js";
+import { Buffer } from "bl";
 
 const topicBulbHomeRust = (bulb: string, argument: string) => ({
   [`${bulb}${argument}`]: {
@@ -50,7 +51,8 @@ const topicBulbNumber = (bulb: string, parameter: string) => ({
   }
 });
 
-const topicHomeBoolean = (name: string, topic: string) => ({
+const topicHomeBoolean = (name: string, topic: string,
+  defaultValue: boolean = false) => ({
   [`${name}`]: {
     state: {
       name: `home-rust/${topic}`,
@@ -60,11 +62,12 @@ const topicHomeBoolean = (name: string, topic: string) => ({
       name: `home-rust/${topic}/set`,
       type: types.option({ on: "true", off: "false" })
     },
-    defaultValue: "OFF"
+    defaultValue: defaultValue ? "on" : "off"
   }
 });
 
-const topicHomeNumber = (name: string, topic: string) => ({
+const topicHomeNumber = (name: string, topic: string,
+  defaultValue: number = 0) => ({
   [`${name}`]: {
     state: {
       name: `home-rust/${topic}`,
@@ -74,7 +77,7 @@ const topicHomeNumber = (name: string, topic: string) => ({
       name: `home-rust/${topic}/set`,
       type: types.string
     },
-    defaultValue: 0
+    defaultValue: defaultValue
   }
 });
 
@@ -147,6 +150,16 @@ const config: Config = {
       ...topicBulbHomeRust("livingroom", "mode"),
       ...topicBulbNumber("livingroom", "brightness"),
       ...topicBulbState("livingroom"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "r"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "g"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "b"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "h"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "s"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "v"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "x"),
+      ...topicBulbHomeRust("ledstrip_livingroom", "y"),
+      ...topicBulbNumber("ledstrip_livingroom", "brightness"),
+      ...topicBulbState("ledstrip_livingroom"),
       nasPower: {
         state: {
           name: "nas/online",
@@ -157,6 +170,59 @@ const config: Config = {
           type: types.string
         },
         defaultValue: "OFF"
+      },
+      heaterOfficeTsoll: {
+        state: {
+          name: "tele/home-rust/fritzbox/device/office/tsoll",
+          type: (msg) => (msg.toString().split(" ")[1])
+        },
+        command: {
+          name: "home-rust/fritzbox/device/office/tsoll/set",
+          type: types.string
+        },
+        defaultValue: "253"
+      },
+      heaterDiningroomTsoll: {
+        state: {
+          name: "tele/home-rust/fritzbox/device/diningroom/tsoll",
+          type: (msg) => ((parseFloat(msg.toString().split(" ")[1])
+          /2).toString())
+        },
+        command: {
+          name: "home-rust/fritzbox/device/diningroom/tsoll/set",
+          type: (msg) => (Buffer.from((parseFloat(msg) * 2).toString()))
+        },
+        defaultValue: "126.5"
+      },
+      heaterBedroomTsoll: {
+        state: {
+          name: "tele/home-rust/fritzbox/device/bedroom/tsoll",
+          type: (msg) => ((parseFloat(msg.toString().split(" ")[1])
+          /2).toString())
+        },
+        command: {
+          name: "home-rust/fritzbox/device/bedroom/tsoll/set",
+          type: (msg) => (Buffer.from((parseFloat(msg) * 2).toString()))
+        },
+        defaultValue: "126.5"
+      },
+      heaterBedroomSummermode: {
+        state: {
+          name: "tele/home-rust/fritzbox/device/bedroom",
+          type: types.json("summeractive")
+        },
+        defaultValue: "1"
+      },
+      heaterOfficeNachtabsenkung: {
+        state: {
+          name: "home-rust/temperature-control/office_heating/heat_request/4",
+          type: types.option({ true: "off", false: "on" })
+        },
+        command: {
+          name: "home-rust/temperature-control/office_heating/heat_request/4",
+          type: types.option({ off: "true", on: "false" })
+        },
+        defaultValue: "on"
       },
       tucanaPower: {
         state: {
@@ -186,20 +252,27 @@ const config: Config = {
       ...topicTasmota("fanBedroom", "sonoff-bedroom-fan"),
       ...topicHomeBoolean("fanBedroomAuto", "temperature-control/bedroom"),
       ...topicHomeNumber("fanBedroomTarget",
-        "temperature-control/bedroom/target"),
+        "temperature-control/bedroom/target", 21.5),
       ...topicTasmota("fanOffice", "sonoff-office-fan"),
       ...topicHomeBoolean("fanOfficeAuto", "temperature-control/office"),
+      ...topicHomeBoolean("heaterOfficeAuto",
+        "temperature-control/office_heating"),
       ...topicHomeBoolean("lueftenHint", "lueften"),
       ...topicHomeNumber("fanOfficeTarget",
-        "temperature-control/office/target"),
+        "temperature-control/office/target", 21.5),
+      ...topicHomeNumber("heaterOfficeTarget",
+        "temperature-control/office_heating/target", 21.5),
       ...topicBulbNumber("hallway", "brightness"),
       ...topicBulbState("hallway"),
       ...topicBulbNumber("hallway2", "brightness"),
       ...topicBulbState("hallway2"),
+      ...topicBulbNumber("diningroom", "brightness"),
+      ...topicBulbState("diningroom"),
       ...topicBulbState("office"),
       ...topicBulbNumber("office", "brightness"),
       ...topicTasmota("speakerOffice", "sonoff-office-speaker"),
-      ...topicHomeBoolean("officeSwitchPollingActive", "switch/office/polling")
+      ...topicHomeBoolean("officeSwitchPollingActive", "switch/office/polling",
+        true)
     }
   ],
   controls: {
@@ -240,11 +313,27 @@ const config: Config = {
       ]
     },
     bedroomFan: {
-      name: "Lüftung Schlafzimmer",
+      name: "Lüftung/Heizung Schlafzimmer",
       position: [140, 25],
-      icon: svg(icons.mdiFan).color(({fanBedroomState}) =>
-        (fanBedroomState === "on" ? hex("#00FF00") : hex("#000000"))),
+      icon: withState((s) => (
+        s["heaterBedroomSummermode"] === "1" ?
+
+          //Sommermodus => Lüftungsstatus anzeigen
+          svg(icons.mdiFan).color(({fanBedroomState}) =>
+            (fanBedroomState === "on" ? hex("#00FF00") : hex("#000000")))
+
+          //Wintermodus => Heizungsstatus anzeigen
+          : s["heaterBedroomTsoll"] === "126.5" ?
+            //Solltemperatur == aus
+            svg(icons.mdiRadiatorDisabled)
+            //Normalbetrieb
+            : svg(icons.mdiRadiator)
+      )),
       ui: [
+        {
+          type: "section",
+          text: "Lüftung"
+        },
         {
           type: "toggle",
           topic: "fanBedroomState",
@@ -258,19 +347,52 @@ const config: Config = {
           icon: svg(icons.mdiAirConditioner)
         },
         {
-          type: "text",
-          text: "Zieltemperatur",
-          icon: svg(icons.mdiTemperatureCelsius),
-          topic: "fanBedroomTarget"
-        },
-        {
           type: "slider",
           min: 15,
           max: 25,
           step: 0.1,
           text: "Zieltemperatur",
           icon: svg(icons.mdiOilTemperature),
-          topic: "fanBedroomTarget"
+          topic: "fanBedroomTarget",
+          marks: [
+            { value: 15, label: "15°C" },
+            { value: 20, label: "20°C" },
+            { value: 25, label: "25°C" }
+          ]
+        },
+        {
+          type: "section",
+          text: "Heizung"
+        },
+        {
+          type: "toggle",
+          topic: "heaterBedroomTsoll",
+          text: "Volle Power",
+          icon: svg(icons.mdiRadiator),
+          on: "127",
+          off: "25"
+        },
+        {
+          type: "toggle",
+          topic: "heaterBedroomTsoll",
+          text: "Ausschalten",
+          icon: svg(icons.mdiRadiatorDisabled),
+          on: "126.5",
+          off: "25"
+        },
+        {
+          type: "slider",
+          min: 8,
+          max: 28,
+          step: 0.5,
+          text: "Zieltemperatur",
+          icon: svg(icons.mdiOilTemperature),
+          topic: "heaterBedroomTsoll",
+          marks: [
+            { value: 8, label: "8°C" },
+            { value: 18, label: "18°C" },
+            { value: 28, label: "28°C" }
+          ]
         }
       ]
     },
@@ -291,12 +413,23 @@ const config: Config = {
       ]
     },
     officeFan: {
-      name: "Lüftung Büro",
+      name: "Lüftung/Heizung Büro",
       position: [140, 658],
-      icon: svg(icons.mdiFan),
-      iconColor: ({fanOfficeState}) =>
-        (fanOfficeState === "on" ? hex("#00FF00") : hex("#000000")),
+      icon: withState(({heaterOfficeAuto}) => (
+
+        heaterOfficeAuto === "on" ?
+
+          svg(icons.mdiRadiator).color(({heaterOfficeTsoll}) =>
+            (heaterOfficeTsoll === "254" ? hex("#FF0000") : hex("#000000")))
+
+          : svg(icons.mdiFan).color(({fanOfficeState}) =>
+            (fanOfficeState === "on" ? hex("#00FF00") : hex("#000000")))
+      )),
       ui: [
+        {
+          type: "section",
+          text: "Lüftung"
+        },
         {
           type: "toggle",
           topic: "fanOfficeState",
@@ -310,10 +443,34 @@ const config: Config = {
           icon: svg(icons.mdiAirConditioner)
         },
         {
-          type: "text",
+          type: "slider",
+          min: 15,
+          max: 25,
+          step: 0.1,
           text: "Zieltemperatur",
-          icon: svg(icons.mdiTemperatureCelsius),
-          topic: "fanOfficeTarget"
+          icon: svg(icons.mdiOilTemperature),
+          topic: "fanOfficeTarget",
+          marks: [
+            { value: 15, label: "15°C" },
+            { value: 20, label: "20°C" },
+            { value: 25, label: "25°C" }
+          ]
+        },
+        {
+          type: "section",
+          text: "Heizung"
+        },
+        {
+          type: "toggle",
+          topic: "heaterOfficeAuto",
+          text: "Automatik",
+          icon: svg(icons.mdiRadiator)
+        },
+        {
+          type: "toggle",
+          topic: "heaterOfficeNachtabsenkung",
+          text: "Nachtabsekung",
+          icon: svg(icons.mdiWeatherNight)
         },
         {
           type: "slider",
@@ -322,7 +479,12 @@ const config: Config = {
           step: 0.1,
           text: "Zieltemperatur",
           icon: svg(icons.mdiOilTemperature),
-          topic: "fanOfficeTarget"
+          topic: "heaterOfficeTarget",
+          marks: [
+            { value: 15, label: "15°C" },
+            { value: 20, label: "20°C" },
+            { value: 25, label: "25°C" }
+          ]
         }
       ]
     },
@@ -437,6 +599,68 @@ const config: Config = {
         }
       ]
     },
+    diningroomLight: {
+      name: "Esszimmer",
+      position: [410, 570],
+      icon: svg(icons.mdiCeilingLight).color(({diningroomState}) =>
+        (diningroomState === "on" ? hex("#00FF00") : hex("#000000"))),
+      ui: [
+        {
+          type: "toggle",
+          topic: "diningroomState",
+          text: "Ein/Ausschalten",
+          icon: svg(icons.mdiPower)
+        },
+        {
+          type: "slider",
+          min: 0,
+          max: 255,
+          text: "Helligkeit",
+          icon: svg(icons.mdiBrightness7),
+          topic: "diningroombrightness"
+        }
+      ]
+    },
+    diningroomHeater: {
+      name: "Heizung Esszimmer",
+      position: [410, 658],
+      icon: withState(({heaterDiningroomTsoll}) => (
+        heaterDiningroomTsoll === "126.5" ?
+          svg(icons.mdiRadiatorDisabled) : svg(icons.mdiRadiator)
+      )),
+      ui: [
+        {
+          type: "toggle",
+          topic: "heaterDiningroomTsoll",
+          text: "Volle Power",
+          icon: svg(icons.mdiRadiator),
+          on: "127",
+          off: "25"
+        },
+        {
+          type: "toggle",
+          topic: "heaterDiningroomTsoll",
+          text: "Ausschalten",
+          icon: svg(icons.mdiRadiatorDisabled),
+          on: "126.5",
+          off: "25"
+        },
+        {
+          type: "slider",
+          min: 8,
+          max: 28,
+          step: 0.5,
+          text: "Zieltemperatur",
+          icon: svg(icons.mdiOilTemperature),
+          topic: "heaterDiningroomTsoll",
+          marks: [
+            { value: 8, label: "8°C" },
+            { value: 18, label: "18°C" },
+            { value: 28, label: "28°C" }
+          ]
+        }
+      ]
+    },
     pi: {
       name: "Pi",
       position: [550, 75],
@@ -546,6 +770,66 @@ const config: Config = {
           }
         ]).concat(sliderSVXY("livingroom", "x"))
         .concat(sliderSVXY("livingroom", "y"))
+    },
+    livingroomLedStrip: {
+      name: "Ledstreifen Wohnzimmer",
+      position: [450, 73],
+      icon: svg(icons.mdiWhiteBalanceIridescent),
+      /* eslint-disable camelcase */
+      iconColor: ({ledstrip_livingroomState}) =>
+        (ledstrip_livingroomState === "on" ? hex("#00FF00") : hex("#000000")),
+      /* eslint-enable camelcase */
+      ui: ([
+        {
+          type: "toggle",
+          topic: "ledstrip_livingroomState",
+          text: "Ein/Ausschalten",
+          icon: svg(icons.mdiPower)
+        },
+        {
+          type: "slider",
+          min: 0,
+          max: 255,
+          text: "Helligkeit",
+          icon: svg(icons.mdiBrightness7),
+          topic: "ledstrip_livingroombrightness"
+        },
+        {
+          type: "dropDown",
+          text: "Modus",
+          topic: "livingroommode",
+          options: {
+            "-1": "Cancel Animation",
+            "0": "Pink",
+            "1": "Kodi",
+            "2": "Sleep",
+            "3": "RGB Fade",
+            "4": "Work"
+          },
+          icon: svg(icons.mdiCog)
+        },
+        {
+          type: "section",
+          text: "RGB"
+        }
+      ]).concat(sliderRGB("ledstrip_livingroom", "r"))
+        .concat(sliderRGB("ledstrip_livingroom", "g"))
+        .concat(sliderRGB("ledstrip_livingroom", "b"))
+        .concat([
+          {
+            type: "section",
+            text: "HSV"
+          }
+        ]).concat(sliderH("ledstrip_livingroom", "h"))
+        .concat(sliderSVXY("ledstrip_livingroom", "s"))
+        .concat(sliderSVXY("ledstrip_livingroom", "v"))
+        .concat([
+          {
+            type: "section",
+            text: "XY"
+          }
+        ]).concat(sliderSVXY("ledstrip_livingroom", "x"))
+        .concat(sliderSVXY("ledstrip_livingroom", "y"))
     }
   },
   layers: [
